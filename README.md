@@ -4,6 +4,18 @@
 
 背景は `nafuda.png` から行ごとに少しずつ違う位置を切り出して作るので、全員分が完全に同じ見た目にはなりません。各行の名札は左右に同じ名前を並べて出力されます。
 
+## Web 版(インストール不要)
+
+`web/` にブラウザだけで動く版があります。Python は不要で、画像や名前はサーバーに送られず、ブラウザの中だけで処理されます。
+
+- ローカルで試す: `python3 -m http.server -d web 8000` を実行して http://localhost:8000 を開く
+- Vercel で公開する: リポジトリをインポートし、Project Settings の **Root Directory** を `web` に、Framework Preset を **Other** にする(ビルドコマンドは不要)
+- GitHub Pages などの静的ホスティングでも、`web/` の中身を置くだけで動きます
+
+画面で背景画像・名前一覧・肩書き・面付け・シードを指定し、プレビューを見ながら「PDF をダウンロード」で生成します。細かい位置や `RANDOM_*` 相当の値は `web/app.js` 先頭の `CONFIG` で調整できます。
+
+フォントは Google Fonts の Noto Serif JP / Noto Sans JP を使います。乱数の実装が Python 版と異なるため、同じシードでも Python 版と Web 版の背景は一致しません。
+
 ## できること
 
 - `nafuda.png` から名札背景を直接生成
@@ -103,6 +115,7 @@ python3 generate_name_tags.py --font /path/to/font.ttf
 - `generate_name_tags.py`: 名札 PDF 生成スクリプト
 - `requirements.txt`: Python 依存関係
 - `names.csv`: サンプル入力
+- `web/`: ブラウザ版(`index.html`, `app.js`, `style.css`)
 
 ## 注意
 
