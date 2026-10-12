@@ -19,7 +19,7 @@
       <p>背景画像と名前一覧から、A4 印刷用の名札 PDF を作ります。</p>
       <p class="privacy-badge">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3Zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4-6.3 6.3Z"/></svg>
-        入力した名前や画像は送信・保存されません(<a href="#privacy">詳しく</a>)
+        <span>入力した名前や画像は送信・保存されません(<a href="#privacy">詳しく</a>)</span>
       </p>
     </header>
 
@@ -51,6 +51,7 @@
               CSV を読み込む
               <input id="csv-input" type="file" accept=".csv,text/csv,text/plain" hidden />
             </label>
+            <button id="csv-template" type="button" class="button secondary small">テンプレートをダウンロード</button>
             <span id="name-count" class="hint"></span>
           </div>
           <p class="hint">1 行に 1 名。1 行目の列名に合わせてカンマで区切ります。所属は省略でき、入れた人だけ共通の肩書きの代わりに表示します。</p>

@@ -538,6 +538,7 @@ const els = {
   dropzone: $("dropzone"),
   names: $("names"),
   csvInput: $("csv-input"),
+  csvTemplate: $("csv-template"),
   nameCount: $("name-count"),
   title: $("title"),
   nameFont: $("name-font"),
@@ -744,6 +745,38 @@ async function generatePdf() {
   }
 }
 
+// Excel で保存した CSV は Shift_JIS のことが多いので、UTF-8 で読めなければそちらで読む
+function decodeCsv(buffer) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder("shift_jis").decode(buffer);
+  }
+}
+
+// Excel でそのまま開けるよう、BOM 付き UTF-8・CRLF で書き出す
+function downloadCsvTemplate() {
+  const withKana = kanaEnabled();
+  const rows = withKana
+    ? [
+        ["名前", "ふりがな", "所属"],
+        ["山田 太郎", "やまだ たろう", "営業部"],
+        ["鈴木 花子", "すずき はなこ", ""],
+      ]
+    : [
+        ["名前", "所属"],
+        ["山田 太郎", "営業部"],
+        ["鈴木 花子", ""],
+      ];
+  const csv = "\uFEFF" + rows.map((row) => row.join(",")).join("\r\n") + "\r\n";
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = withKana ? "names_template_kana.csv" : "names_template.csv";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function loadImageFile(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -794,10 +827,11 @@ function init() {
     els.dropzone.addEventListener(type, () => els.dropzone.classList.remove("dragover")),
   );
 
+  els.csvTemplate.addEventListener("click", downloadCsvTemplate);
   els.csvInput.addEventListener("change", async () => {
     const file = els.csvInput.files[0];
     if (!file) return;
-    els.names.value = await file.text();
+    els.names.value = decodeCsv(await file.arrayBuffer());
     els.csvInput.value = "";
     state.page = 0;
     schedulePreview();

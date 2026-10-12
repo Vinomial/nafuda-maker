@@ -154,6 +154,7 @@ textarea:focus-visible,
 
 .row-inline {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-top: 8px;
@@ -432,4 +433,8 @@ details.hint summary {
 .segmented label:has(input:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.privacy-badge a {
+  white-space: nowrap;
 }
