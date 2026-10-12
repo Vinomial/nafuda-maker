@@ -57,8 +57,8 @@ const CONFIG = {
 
   // 名札サイズ (mm)。null はページに合わせて最大化
   cardSizes: {
+    meishi: [91, 55], // 名刺サイズ。市販の名札ケースの多くに入る (初期値)
     auto: null,
-    meishi: [91, 55], // 名刺サイズ。市販の名札ケースの多くに入る
   },
 
   // PDF に埋め込む名札画像の解像度倍率 (3 なら 1611x978px)
@@ -569,7 +569,7 @@ const state = {
   columns: 2,
   seed: "",
   showKana: false,
-  cardSize: null,
+  cardSize: CONFIG.cardSizes.meishi,
   arrange: "duplicate",
   border: "solid",
   page: 0,
