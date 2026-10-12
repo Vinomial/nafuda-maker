@@ -48,7 +48,11 @@
             </label>
             <span id="name-count" class="hint"></span>
           </div>
-          <p class="hint">1 行に 1 名。CSV を貼り付けても OK です(<code>name</code> / <code>氏名</code> / <code>名前</code> 列を自動で使います。<code>#</code> で始まる行は無視)。</p>
+          <p class="hint">1 行に 1 名。<code>名前,ふりがな,所属</code> のようにカンマで区切ると、ふりがなや人ごとの所属も入れられます(後ろの列は省略可)。</p>
+          <details class="hint">
+            <summary>CSV の列名について</summary>
+            1 行目に列名があれば、その列を使います。<code>name</code> / <code>氏名</code> / <code>名前</code>、<code>ふりがな</code> / <code>フリガナ</code> / <code>kana</code>、<code>所属</code> / <code>会社</code> / <code>部署</code> / <code>役職</code> などを自動で判定します。所属がある人は、共通の肩書きの代わりにそれを表示します。<code>#</code> で始まる行は無視します。
+          </details>
         </section>
 
         <section class="field">
@@ -80,6 +84,35 @@
           </div>
           <p class="hint">同じシードなら同じ背景配置になります。</p>
         </section>
+
+        <details class="field options">
+          <summary class="label">4. 詳細オプション</summary>
+
+          <label class="check">
+            <input id="show-kana" type="checkbox" checked />
+            ふりがなを表示する(名前一覧にふりがながある場合)
+          </label>
+
+          <label class="sub" for="card-size">名札のサイズ</label>
+          <select id="card-size">
+            <option value="auto">ページに合わせて最大</option>
+            <option value="meishi">名刺サイズ 91×55mm(名札ケース用)</option>
+          </select>
+          <p id="grid-note" class="hint"></p>
+
+          <label class="sub" for="arrange">並べ方</label>
+          <select id="arrange">
+            <option value="duplicate">同じ名前を横に並べる(予備・両面用)</option>
+            <option value="sequential">名前を順番に詰める(用紙を節約)</option>
+          </select>
+
+          <label class="sub" for="border">枠線</label>
+          <select id="border">
+            <option value="solid">実線</option>
+            <option value="dashed">点線(切り取り線)</option>
+            <option value="none">なし</option>
+          </select>
+        </details>
 
         <button id="generate" type="submit" class="button primary">PDF をダウンロード</button>
         <p id="message" class="message" role="status" aria-live="polite"></p>

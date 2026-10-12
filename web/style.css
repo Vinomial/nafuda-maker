@@ -367,3 +367,30 @@ a {
   text-align: center;
   font-size: 0.85rem;
 }
+
+.options summary {
+  cursor: pointer;
+}
+
+.options[open] summary {
+  margin-bottom: 4px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+details.hint summary {
+  cursor: pointer;
+  margin-bottom: 4px;
+}
