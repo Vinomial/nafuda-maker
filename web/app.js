@@ -16,12 +16,19 @@ const CONFIG = {
   nameCenterY: 182,
   nameFontSize: 64,
 
+  // ふりがなを表示するときは名前を少し下げる
+  kanaCenterY: 145,
+  kanaFontSize: 21,
+  nameCenterYWithKana: 194,
+
   quietZone: { left: 52, top: 84, right: 486, bottom: 236, radius: 18 },
   quietZoneFill: "rgba(255, 255, 255, 0.843)", // 215 / 255
 
   // ===== 以下は通常触らない =====
   minNameFontSize: 40,
   maxNameWidth: 390,
+  minTitleFontSize: 18,
+  maxTitleWidth: 418,
   titleStrokeWidth: 1,
 
   randomTopSourceHeight: 420,
@@ -50,6 +57,12 @@ const CONFIG = {
   pageGapXMm: 0,
   pageGapYMm: 0,
 
+  // 名札サイズ (mm)。null はページに合わせて最大化
+  cardSizes: {
+    meishi: [91, 55], // 名刺サイズ。市販の名札ケースの多くに入る (初期値)
+    auto: null,
+  },
+
   // PDF に埋め込む名札画像の解像度倍率 (3 なら 1611x978px)
   pdfScale: 3,
   pdfJpegQuality: 0.92,
@@ -60,18 +73,23 @@ const FONTS = {
   sans: { family: '"Noto Sans JP"', weight: 700 },
 };
 const TITLE_FONT = FONTS.sans;
-const NAME_HEADERS = ["name", "氏名", "名前", "fullname", "full_name"];
+// CSV の列名 (小文字で比較する)
+const COLUMN_HEADERS = {
+  name: ["name", "氏名", "名前", "fullname", "full_name"],
+  kana: ["ふりがな", "フリガナ", "よみがな", "ヨミガナ", "kana", "furigana", "reading"],
+  org: ["所属", "会社", "部署", "役職", "団体", "affiliation", "organization", "company", "title"],
+};
 // 架空の人物
-const SAMPLE_NAMES = [
-  "山田 太郎",
-  "鈴木 花子",
-  "佐藤 一郎",
-  "高橋 美咲",
-  "田中 健太",
-  "伊藤 さくら",
-  "渡辺 大輔",
-  "中村 結衣",
-  "小林 翔",
+const SAMPLE_ROWS = [
+  ["山田 太郎", "やまだ たろう"],
+  ["鈴木 花子", "すずき はなこ"],
+  ["佐藤 一郎", "さとう いちろう"],
+  ["高橋 美咲", "たかはし みさき"],
+  ["田中 健太", "たなか けんた"],
+  ["伊藤 さくら", "いとう さくら"],
+  ["渡辺 大輔", "わたなべ だいすけ"],
+  ["中村 結衣", "なかむら ゆい"],
+  ["小林 翔", "こばやし しょう"],
 ];
 
 const MM = 72 / 25.4;
@@ -166,24 +184,29 @@ function splitCsvLine(line) {
   return fields;
 }
 
-function parseNames(text) {
+// 1 行 1 名。列名の行があればそれに従い、なければ「名前,(ふりがな,)所属」の順とみなす
+function parseEntries(text, withKana) {
   const lines = text
-    .replace(/^﻿/, "")
+    .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
     .filter((line) => line.trim() && !line.trimStart().startsWith("#"));
   if (lines.length === 0) return [];
 
   const header = splitCsvLine(lines[0]).map((f) => f.trim().toLowerCase());
-  let column = 0;
+  const find = (key) => header.findIndex((f) => COLUMN_HEADERS[key].includes(f));
+  let columns = withKana ? { name: 0, kana: 1, org: 2 } : { name: 0, kana: -1, org: 1 };
   let body = lines;
-  const headerIndex = header.findIndex((f) => NAME_HEADERS.includes(f));
-  if (headerIndex >= 0) {
-    column = headerIndex;
+  if (find("name") >= 0) {
+    columns = { name: find("name"), kana: find("kana"), org: find("org") };
     body = lines.slice(1);
   }
   return body
-    .map((line) => (splitCsvLine(line)[column] || "").trim())
-    .filter(Boolean);
+    .map((line) => {
+      const fields = splitCsvLine(line);
+      const get = (i) => (i >= 0 ? fields[i] || "" : "").trim();
+      return { name: get(columns.name), kana: get(columns.kana), org: get(columns.org) };
+    })
+    .filter((entry) => entry.name);
 }
 
 function formatDisplayName(name) {
@@ -374,25 +397,46 @@ function buildRandomizedBackground(source, variantKey, seed, scale) {
 
 const fontSpec = (font, size) => `${font.weight} ${size}px ${font.family}`;
 
-async function ensureFonts(texts, nameFont) {
+async function ensureFonts(entries, options) {
   // Google Fonts は文字ごとに分割配信されるので、実際に使う文字で読み込む
-  const nameText = texts.join("");
+  const titleText = options.title + entries.map((e) => e.org).join("");
+  const nameText = entries.map((e) => e.name + e.kana).join("");
   await Promise.all([
-    document.fonts.load(fontSpec(TITLE_FONT, CONFIG.titleFontSize), state.title || "あ"),
-    document.fonts.load(fontSpec(nameFont, CONFIG.nameFontSize), nameText || "あ"),
+    document.fonts.load(fontSpec(TITLE_FONT, CONFIG.titleFontSize), titleText || "あ"),
+    document.fonts.load(fontSpec(options.nameFont, CONFIG.nameFontSize), nameText || "あ"),
   ]);
 }
 
-function fitFont(ctx, text, font) {
-  for (let size = CONFIG.nameFontSize; size >= CONFIG.minNameFontSize; size -= 2) {
-    ctx.font = fontSpec(font, size);
-    const m = ctx.measureText(text);
-    if (m.actualBoundingBoxLeft + m.actualBoundingBoxRight <= CONFIG.maxNameWidth) return;
-  }
-  ctx.font = fontSpec(font, CONFIG.minNameFontSize);
+const inkWidth = (m) => m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
+
+// 最小サイズでも入りきらないときに使う横方向の縮小率
+function squeezeRatio(ctx, text, maxWidth) {
+  const width = inkWidth(ctx.measureText(text));
+  return maxWidth && width > maxWidth ? maxWidth / width : 1;
 }
 
-function createNameCard(background, name, options, scale) {
+function drawCenteredText(ctx, text, centerX, centerY, maxWidth) {
+  const m = ctx.measureText(text);
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.scale(squeezeRatio(ctx, text, maxWidth), 1);
+  ctx.fillText(
+    text,
+    -(m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2,
+    (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2,
+  );
+  ctx.restore();
+}
+
+function fitFont(ctx, text, font, startSize, minSize, maxWidth) {
+  for (let size = startSize; size >= minSize; size -= 2) {
+    ctx.font = fontSpec(font, size);
+    if (inkWidth(ctx.measureText(text)) <= maxWidth) return;
+  }
+  ctx.font = fontSpec(font, minSize);
+}
+
+function createNameCard(background, entry, options, scale) {
   const canvas = document.createElement("canvas");
   canvas.width = background.width;
   canvas.height = background.height;
@@ -408,54 +452,102 @@ function createNameCard(background, name, options, scale) {
 
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
-  if (options.title) {
-    ctx.font = fontSpec(TITLE_FONT, CONFIG.titleFontSize);
-    const m = ctx.measureText(options.title);
-    const y = CONFIG.titleY + m.fontBoundingBoxAscent;
+  // 人ごとの所属があれば共通の肩書きより優先する
+  const title = entry.org || options.title;
+  if (title) {
+    fitFont(ctx, title, TITLE_FONT, CONFIG.titleFontSize, CONFIG.minTitleFontSize, CONFIG.maxTitleWidth);
+    const m = ctx.measureText(title);
+    ctx.save();
+    ctx.translate(CONFIG.titleX, CONFIG.titleY + m.fontBoundingBoxAscent);
+    ctx.scale(squeezeRatio(ctx, title, CONFIG.maxTitleWidth), 1);
     ctx.lineJoin = "round";
     ctx.lineWidth = CONFIG.titleStrokeWidth * 2;
     ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(options.title, CONFIG.titleX, y);
+    ctx.strokeText(title, 0, 0);
     ctx.fillStyle = "#000000";
-    ctx.fillText(options.title, CONFIG.titleX, y);
+    ctx.fillText(title, 0, 0);
+    ctx.restore();
   }
 
-  const displayName = formatDisplayName(name);
-  fitFont(ctx, displayName, options.nameFont);
-  const m = ctx.measureText(displayName);
-  const x = CONFIG.nameCenterX - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
-  const y = CONFIG.nameCenterY + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
   ctx.fillStyle = "#000000";
-  ctx.fillText(displayName, x, y);
+  const showKana = options.showKana && entry.kana;
+  if (showKana) {
+    ctx.font = fontSpec(options.nameFont, CONFIG.kanaFontSize);
+    drawCenteredText(
+      ctx,
+      formatDisplayName(entry.kana),
+      CONFIG.nameCenterX,
+      CONFIG.kanaCenterY,
+      CONFIG.maxNameWidth,
+    );
+  }
 
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#000000";
-  ctx.strokeRect(1, 1, CONFIG.templateWidth - 2, CONFIG.templateHeight - 2);
+  const displayName = formatDisplayName(entry.name);
+  fitFont(
+    ctx,
+    displayName,
+    options.nameFont,
+    CONFIG.nameFontSize,
+    CONFIG.minNameFontSize,
+    CONFIG.maxNameWidth,
+  );
+  drawCenteredText(
+    ctx,
+    displayName,
+    CONFIG.nameCenterX,
+    showKana ? CONFIG.nameCenterYWithKana : CONFIG.nameCenterY,
+    CONFIG.maxNameWidth,
+  );
+
+  if (options.border !== "none") {
+    ctx.lineWidth = options.border === "dashed" ? 1.5 : 2;
+    ctx.strokeStyle = options.border === "dashed" ? "#666666" : "#000000";
+    ctx.setLineDash(options.border === "dashed" ? [8, 6] : []);
+    ctx.strokeRect(1, 1, CONFIG.templateWidth - 2, CONFIG.templateHeight - 2);
+  }
   return canvas;
 }
 
-function renderCard(index, name, options, scale) {
+function renderCard(index, entry, options, scale) {
   const background = buildRandomizedBackground(
     options.source,
-    `${index}:${name}`,
+    `${index}:${entry.name}`,
     options.seed,
     scale,
   );
-  return createNameCard(background, name, options, scale);
+  return createNameCard(background, entry, options, scale);
 }
 
 // ===== レイアウト =====
 
-function computeLayout(rows, columns) {
-  const marginX = CONFIG.pageMarginMm * MM;
-  const marginY = CONFIG.pageMarginMm * MM;
-  const gapX = CONFIG.pageGapXMm * MM;
-  const gapY = CONFIG.pageGapYMm * MM;
-  const ratio = CONFIG.templateWidth / CONFIG.templateHeight;
-  const usableWidth = A4_WIDTH - 2 * marginX - (columns - 1) * gapX;
-  const usableHeight = A4_HEIGHT - 2 * marginY - (rows - 1) * gapY;
-  const cardWidth = Math.min(usableWidth / columns, (usableHeight / rows) * ratio);
-  const cardHeight = cardWidth / ratio;
+const PAGE_MARGIN = CONFIG.pageMarginMm * MM;
+const GAP_X = CONFIG.pageGapXMm * MM;
+const GAP_Y = CONFIG.pageGapYMm * MM;
+
+// 固定サイズの名札が 1 ページに何行・何枚まで入るか
+function maxGrid(sizeMm) {
+  if (!sizeMm) return { rows: Infinity, columns: Infinity };
+  const [w, h] = sizeMm.map((v) => v * MM);
+  return {
+    rows: Math.max(1, Math.floor((A4_HEIGHT - 2 * PAGE_MARGIN + GAP_Y) / (h + GAP_Y))),
+    columns: Math.max(1, Math.floor((A4_WIDTH - 2 * PAGE_MARGIN + GAP_X) / (w + GAP_X))),
+  };
+}
+
+function computeLayout(rows, columns, sizeMm) {
+  const gapX = GAP_X;
+  const gapY = GAP_Y;
+  let cardWidth;
+  let cardHeight;
+  if (sizeMm) {
+    [cardWidth, cardHeight] = sizeMm.map((v) => v * MM);
+  } else {
+    const ratio = CONFIG.templateWidth / CONFIG.templateHeight;
+    const usableWidth = A4_WIDTH - 2 * PAGE_MARGIN - (columns - 1) * gapX;
+    const usableHeight = A4_HEIGHT - 2 * PAGE_MARGIN - (rows - 1) * gapY;
+    cardWidth = Math.min(usableWidth / columns, (usableHeight / rows) * ratio);
+    cardHeight = cardWidth / ratio;
+  }
   const totalWidth = columns * cardWidth + (columns - 1) * gapX;
   const totalHeight = rows * cardHeight + (rows - 1) * gapY;
   const startX = (A4_WIDTH - totalWidth) / 2;
@@ -474,10 +566,13 @@ const $ = (id) => document.getElementById(id);
 const els = {
   bgInput: $("bg-input"),
   sampleBg: $("sample-bg"),
+  clearBg: $("clear-bg"),
+  summary: $("summary"),
   bgStatus: $("bg-status"),
   dropzone: $("dropzone"),
   names: $("names"),
   csvInput: $("csv-input"),
+  csvTemplate: $("csv-template"),
   nameCount: $("name-count"),
   title: $("title"),
   nameFont: $("name-font"),
@@ -492,18 +587,36 @@ const els = {
   prevPage: $("prev-page"),
   nextPage: $("next-page"),
   pageLabel: $("page-label"),
+  kanaRadios: document.querySelectorAll('input[name="kana"]'),
+  cardSize: $("card-size"),
+  arrange: $("arrange"),
+  border: $("border"),
+  gridNote: $("grid-note"),
 };
 
 const state = {
   source: null,
-  names: [],
+  entries: [],
   title: "",
   nameFont: FONTS.serif,
   rows: 5,
   columns: 2,
   seed: "",
+  showKana: false,
+  cardSize: CONFIG.cardSizes.meishi,
+  arrange: "duplicate",
+  border: "solid",
   page: 0,
 };
+
+function kanaEnabled() {
+  return document.querySelector('input[name="kana"]:checked')?.value === "on";
+}
+
+function sampleText(withKana) {
+  const rows = SAMPLE_ROWS.map(([name, kana]) => (withKana ? `${name},${kana}` : name));
+  return [withKana ? "名前,ふりがな,所属" : "名前,所属", ...rows].join("\n");
+}
 
 function readPositiveInt(input, fallback) {
   const value = parseInt(input.value, 10);
@@ -511,18 +624,40 @@ function readPositiveInt(input, fallback) {
 }
 
 function readForm() {
-  state.names = parseNames(els.names.value);
+  state.showKana = kanaEnabled();
+  state.entries = parseEntries(els.names.value, state.showKana);
   state.title = els.title.value.trim();
   state.nameFont = FONTS[els.nameFont.value] || FONTS.serif;
-  state.rows = readPositiveInt(els.rows, 5);
-  state.columns = readPositiveInt(els.columns, 2);
+  state.cardSize = CONFIG.cardSizes[els.cardSize.value] || null;
+  state.arrange = els.arrange.value;
+  state.border = els.border.value;
+
+  const max = maxGrid(state.cardSize);
+  state.rows = Math.min(readPositiveInt(els.rows, 5), max.rows);
+  state.columns = Math.min(readPositiveInt(els.columns, 2), max.columns);
+  els.gridNote.textContent = state.cardSize
+    ? `このサイズは 1 ページに最大 ${max.rows} 行 × ${max.columns} 枚です。`
+    : "";
+
   if (!els.seed.value.trim()) els.seed.value = randomSeed();
   state.seed = els.seed.value.trim();
-  els.nameCount.textContent = `${state.names.length} 名`;
+  els.nameCount.textContent = `${state.entries.length} 名`;
 }
 
-function pageCount() {
-  return Math.max(1, Math.ceil(state.names.length / state.rows));
+// ページごとに、どの名札をどの位置 (行・列) に置くかを決める
+function buildPages() {
+  const sequential = state.arrange === "sequential";
+  const perPage = sequential ? state.rows * state.columns : state.rows;
+  const pages = [];
+  state.entries.forEach((entry, index) => {
+    const i = index % perPage;
+    if (i === 0) pages.push([]);
+    const slots = sequential
+      ? [{ row: Math.floor(i / state.columns), column: i % state.columns }]
+      : Array.from({ length: state.columns }, (_, column) => ({ row: i, column }));
+    pages[pages.length - 1].push({ entry, index, slots });
+  });
+  return pages;
 }
 
 function cardOptions() {
@@ -531,6 +666,8 @@ function cardOptions() {
     title: state.title,
     nameFont: state.nameFont,
     seed: state.seed,
+    showKana: state.showKana,
+    border: state.border,
   };
 }
 
@@ -544,35 +681,43 @@ let previewToken = 0;
 async function renderPreview() {
   const token = ++previewToken;
   readForm();
-  state.page = clamp(state.page, 0, pageCount() - 1);
-  els.pageLabel.textContent = `${state.page + 1} / ${pageCount()}`;
+  const pages = buildPages();
+  const pageCount = Math.max(1, pages.length);
+  state.page = clamp(state.page, 0, pageCount - 1);
+  els.pageLabel.textContent = `${state.page + 1} / ${pageCount}`;
+  const cardTotal = pages.flat().reduce((sum, card) => sum + card.slots.length, 0);
+  els.summary.textContent = state.entries.length
+    ? `${state.entries.length} 名 → A4 ${pages.length} ページ(名札 ${cardTotal} 枚)`
+    : "";
   els.prevPage.disabled = state.page === 0;
-  els.nextPage.disabled = state.page >= pageCount() - 1;
+  els.nextPage.disabled = state.page >= pageCount - 1;
 
-  const offset = state.page * state.rows;
-  const pageNames = state.names.slice(offset, offset + state.rows);
-  await ensureFonts(pageNames, state.nameFont);
+  const cards = pages[state.page] || [];
+  const options = cardOptions();
+  await ensureFonts(
+    cards.map((card) => card.entry),
+    options,
+  );
   if (token !== previewToken) return;
 
-  const layout = computeLayout(state.rows, state.columns);
+  const layout = computeLayout(state.rows, state.columns, state.cardSize);
   const scale = Math.min(2, window.devicePixelRatio || 1);
-  const options = cardOptions();
   const fragment = document.createDocumentFragment();
-  pageNames.forEach((name, row) => {
-    const url = renderCard(offset + row, name, options, scale).toDataURL("image/png");
-    for (let column = 0; column < state.columns; column++) {
+  cards.forEach(({ entry, index, slots }) => {
+    const url = renderCard(index, entry, options, scale).toDataURL("image/png");
+    slots.forEach(({ row, column }, i) => {
       const { x, y } = layout.position(row, column);
       const img = document.createElement("img");
       img.src = url;
-      img.alt = column === 0 ? `${name} の名札` : "";
+      img.alt = i === 0 ? `${entry.name} の名札` : "";
       img.style.left = `${(x / A4_WIDTH) * 100}%`;
       img.style.top = `${(y / A4_HEIGHT) * 100}%`;
       img.style.width = `${(layout.cardWidth / A4_WIDTH) * 100}%`;
       img.style.height = `${(layout.cardHeight / A4_HEIGHT) * 100}%`;
       fragment.appendChild(img);
-    }
+    });
   });
-  if (pageNames.length === 0) {
+  if (cards.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
     empty.textContent = "名前を入力するとここに表示されます";
@@ -594,7 +739,7 @@ const nextFrame = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 async function generatePdf() {
   readForm();
-  if (state.names.length === 0) {
+  if (state.entries.length === 0) {
     setMessage("名前が 1 件もありません。", true);
     return;
   }
@@ -605,34 +750,69 @@ async function generatePdf() {
 
   els.generate.disabled = true;
   try {
-    await ensureFonts(state.names, state.nameFont);
+    const options = cardOptions();
+    await ensureFonts(state.entries, options);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
-    const layout = computeLayout(state.rows, state.columns);
-    const options = cardOptions();
+    const layout = computeLayout(state.rows, state.columns, state.cardSize);
+    const pages = buildPages();
+    const total = state.entries.length;
 
-    for (let index = 0; index < state.names.length; index++) {
-      const row = index % state.rows;
-      if (index > 0 && row === 0) pdf.addPage();
-      setMessage(`作成中… ${index + 1} / ${state.names.length}`);
-      await nextFrame();
+    for (const [pageIndex, cards] of pages.entries()) {
+      if (pageIndex > 0) pdf.addPage();
+      for (const { entry, index, slots } of cards) {
+        setMessage(`作成中… ${index + 1} / ${total}`);
+        await nextFrame();
 
-      const card = renderCard(index, state.names[index], options, CONFIG.pdfScale);
-      const data = card.toDataURL("image/jpeg", CONFIG.pdfJpegQuality);
-      for (let column = 0; column < state.columns; column++) {
-        const { x, y } = layout.position(row, column);
-        pdf.addImage(data, "JPEG", x, y, layout.cardWidth, layout.cardHeight, `card-${index}`);
+        const card = renderCard(index, entry, options, CONFIG.pdfScale);
+        const data = card.toDataURL("image/jpeg", CONFIG.pdfJpegQuality);
+        for (const { row, column } of slots) {
+          const { x, y } = layout.position(row, column);
+          pdf.addImage(data, "JPEG", x, y, layout.cardWidth, layout.cardHeight, `card-${index}`);
+        }
       }
     }
 
     pdf.save("name_tags.pdf");
-    setMessage(`PDF を作成しました(${state.names.length} 名・${pageCount()} ページ、シード: ${state.seed})`);
+    setMessage(`PDF を作成しました(${total} 名・${pages.length} ページ、シード: ${state.seed})`);
   } catch (error) {
     console.error(error);
     setMessage(`PDF の作成に失敗しました: ${error.message}`, true);
   } finally {
     els.generate.disabled = false;
   }
+}
+
+// Excel で保存した CSV は Shift_JIS のことが多いので、UTF-8 で読めなければそちらで読む
+function decodeCsv(buffer) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder("shift_jis").decode(buffer);
+  }
+}
+
+// Excel でそのまま開けるよう、BOM 付き UTF-8・CRLF で書き出す
+function downloadCsvTemplate() {
+  const withKana = kanaEnabled();
+  const rows = withKana
+    ? [
+        ["名前", "ふりがな", "所属"],
+        ["山田 太郎", "やまだ たろう", "営業部"],
+        ["鈴木 花子", "すずき はなこ", ""],
+      ]
+    : [
+        ["名前", "所属"],
+        ["山田 太郎", "営業部"],
+        ["鈴木 花子", ""],
+      ];
+  const csv = "\uFEFF" + rows.map((row) => row.join(",")).join("\r\n") + "\r\n";
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = withKana ? "names_template_kana.csv" : "names_template.csv";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function loadImageFile(file) {
@@ -651,32 +831,40 @@ function loadImageFile(file) {
   });
 }
 
+const DROPZONE_PROMPT = "クリックまたはドラッグ&ドロップで画像を選択";
+
+function setSource(source, label) {
+  state.source = source;
+  els.bgStatus.textContent = source ? `${label}(クリックまたはドロップで変更)` : DROPZONE_PROMPT;
+  els.dropzone.classList.toggle("has-image", Boolean(source));
+  setMessage("");
+  schedulePreview();
+}
+
 async function handleImageFile(file) {
   if (!file) return;
   try {
     const img = await loadImageFile(file);
-    state.source = prepareSource(img);
-    els.bgStatus.textContent = `${file.name}(${img.width}×${img.height})`;
-    els.dropzone.classList.add("has-image");
-    setMessage("");
-    schedulePreview();
+    setSource(prepareSource(img), `${file.name}(${img.width}×${img.height})`);
   } catch (error) {
     setMessage(error.message, true);
   }
 }
 
 function init() {
-  els.names.value = ["name", ...SAMPLE_NAMES].join("\n");
+  els.names.value = sampleText(false);
   els.seed.value = randomSeed();
+  // 開いた直後から仕上がりのイメージが分かるよう、サンプル背景で始める
+  setSource(createSampleSource(), "サンプル背景");
 
   els.bgInput.addEventListener("change", () => handleImageFile(els.bgInput.files[0]));
   els.sampleBg.addEventListener("click", () => {
-    state.source = createSampleSource();
     els.bgInput.value = "";
-    els.bgStatus.textContent = "サンプル背景(自動生成)";
-    els.dropzone.classList.add("has-image");
-    setMessage("");
-    schedulePreview();
+    setSource(createSampleSource(), "サンプル背景");
+  });
+  els.clearBg.addEventListener("click", () => {
+    els.bgInput.value = "";
+    setSource(null);
   });
   ["dragenter", "dragover"].forEach((type) =>
     els.dropzone.addEventListener(type, () => els.dropzone.classList.add("dragover")),
@@ -685,10 +873,11 @@ function init() {
     els.dropzone.addEventListener(type, () => els.dropzone.classList.remove("dragover")),
   );
 
+  els.csvTemplate.addEventListener("click", downloadCsvTemplate);
   els.csvInput.addEventListener("change", async () => {
     const file = els.csvInput.files[0];
     if (!file) return;
-    els.names.value = await file.text();
+    els.names.value = decodeCsv(await file.arrayBuffer());
     els.csvInput.value = "";
     state.page = 0;
     schedulePreview();
@@ -697,7 +886,17 @@ function init() {
   [els.names, els.title, els.rows, els.columns, els.seed].forEach((el) =>
     el.addEventListener("input", schedulePreview),
   );
-  els.nameFont.addEventListener("change", schedulePreview);
+  // サンプルのままなら、ふりがなの有無に合わせてサンプルも入れ替える
+  els.kanaRadios.forEach((radio) =>
+    radio.addEventListener("change", () => {
+      const withKana = kanaEnabled();
+      if (els.names.value.trim() === sampleText(!withKana)) els.names.value = sampleText(withKana);
+      schedulePreview();
+    }),
+  );
+  [els.nameFont, els.cardSize, els.arrange, els.border].forEach((el) =>
+    el.addEventListener("change", schedulePreview),
+  );
   els.reseed.addEventListener("click", () => {
     els.seed.value = randomSeed();
     schedulePreview();

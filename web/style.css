@@ -154,6 +154,7 @@ textarea:focus-visible,
 
 .row-inline {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-top: 8px;
@@ -366,4 +367,89 @@ a {
   padding: 8px 16px 32px;
   text-align: center;
   font-size: 0.85rem;
+}
+
+.options summary {
+  cursor: pointer;
+}
+
+.options[open] summary {
+  margin-bottom: 4px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+details.hint summary {
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.segmented {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.segmented .sub {
+  margin: 0 8px 0 0;
+}
+
+.segmented label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.segmented label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.privacy-badge a {
+  white-space: nowrap;
+}
+
+.summary {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 広い画面では、フォームを下までスクロールしてもプレビューが見えるようにする */
+@media (min-width: 821px) {
+  .preview-panel {
+    position: sticky;
+    top: 16px;
+  }
 }
