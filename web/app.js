@@ -27,6 +27,8 @@ const CONFIG = {
   // ===== 以下は通常触らない =====
   minNameFontSize: 40,
   maxNameWidth: 390,
+  minTitleFontSize: 18,
+  maxTitleWidth: 418,
   titleStrokeWidth: 1,
 
   randomTopSourceHeight: 420,
@@ -405,20 +407,33 @@ async function ensureFonts(entries, options) {
   ]);
 }
 
-function drawCenteredText(ctx, text, centerX, centerY) {
-  const m = ctx.measureText(text);
-  const x = centerX - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
-  const y = centerY + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-  ctx.fillText(text, x, y);
+const inkWidth = (m) => m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
+
+// 最小サイズでも入りきらないときに使う横方向の縮小率
+function squeezeRatio(ctx, text, maxWidth) {
+  const width = inkWidth(ctx.measureText(text));
+  return maxWidth && width > maxWidth ? maxWidth / width : 1;
 }
 
-function fitFont(ctx, text, font) {
-  for (let size = CONFIG.nameFontSize; size >= CONFIG.minNameFontSize; size -= 2) {
+function drawCenteredText(ctx, text, centerX, centerY, maxWidth) {
+  const m = ctx.measureText(text);
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.scale(squeezeRatio(ctx, text, maxWidth), 1);
+  ctx.fillText(
+    text,
+    -(m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2,
+    (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2,
+  );
+  ctx.restore();
+}
+
+function fitFont(ctx, text, font, startSize, minSize, maxWidth) {
+  for (let size = startSize; size >= minSize; size -= 2) {
     ctx.font = fontSpec(font, size);
-    const m = ctx.measureText(text);
-    if (m.actualBoundingBoxLeft + m.actualBoundingBoxRight <= CONFIG.maxNameWidth) return;
+    if (inkWidth(ctx.measureText(text)) <= maxWidth) return;
   }
-  ctx.font = fontSpec(font, CONFIG.minNameFontSize);
+  ctx.font = fontSpec(font, minSize);
 }
 
 function createNameCard(background, entry, options, scale) {
@@ -440,31 +455,48 @@ function createNameCard(background, entry, options, scale) {
   // 人ごとの所属があれば共通の肩書きより優先する
   const title = entry.org || options.title;
   if (title) {
-    ctx.font = fontSpec(TITLE_FONT, CONFIG.titleFontSize);
+    fitFont(ctx, title, TITLE_FONT, CONFIG.titleFontSize, CONFIG.minTitleFontSize, CONFIG.maxTitleWidth);
     const m = ctx.measureText(title);
-    const y = CONFIG.titleY + m.fontBoundingBoxAscent;
+    ctx.save();
+    ctx.translate(CONFIG.titleX, CONFIG.titleY + m.fontBoundingBoxAscent);
+    ctx.scale(squeezeRatio(ctx, title, CONFIG.maxTitleWidth), 1);
     ctx.lineJoin = "round";
     ctx.lineWidth = CONFIG.titleStrokeWidth * 2;
     ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(title, CONFIG.titleX, y);
+    ctx.strokeText(title, 0, 0);
     ctx.fillStyle = "#000000";
-    ctx.fillText(title, CONFIG.titleX, y);
+    ctx.fillText(title, 0, 0);
+    ctx.restore();
   }
 
   ctx.fillStyle = "#000000";
   const showKana = options.showKana && entry.kana;
   if (showKana) {
     ctx.font = fontSpec(options.nameFont, CONFIG.kanaFontSize);
-    drawCenteredText(ctx, formatDisplayName(entry.kana), CONFIG.nameCenterX, CONFIG.kanaCenterY);
+    drawCenteredText(
+      ctx,
+      formatDisplayName(entry.kana),
+      CONFIG.nameCenterX,
+      CONFIG.kanaCenterY,
+      CONFIG.maxNameWidth,
+    );
   }
 
   const displayName = formatDisplayName(entry.name);
-  fitFont(ctx, displayName, options.nameFont);
+  fitFont(
+    ctx,
+    displayName,
+    options.nameFont,
+    CONFIG.nameFontSize,
+    CONFIG.minNameFontSize,
+    CONFIG.maxNameWidth,
+  );
   drawCenteredText(
     ctx,
     displayName,
     CONFIG.nameCenterX,
     showKana ? CONFIG.nameCenterYWithKana : CONFIG.nameCenterY,
+    CONFIG.maxNameWidth,
   );
 
   if (options.border !== "none") {
@@ -534,6 +566,8 @@ const $ = (id) => document.getElementById(id);
 const els = {
   bgInput: $("bg-input"),
   sampleBg: $("sample-bg"),
+  clearBg: $("clear-bg"),
+  summary: $("summary"),
   bgStatus: $("bg-status"),
   dropzone: $("dropzone"),
   names: $("names"),
@@ -651,6 +685,10 @@ async function renderPreview() {
   const pageCount = Math.max(1, pages.length);
   state.page = clamp(state.page, 0, pageCount - 1);
   els.pageLabel.textContent = `${state.page + 1} / ${pageCount}`;
+  const cardTotal = pages.flat().reduce((sum, card) => sum + card.slots.length, 0);
+  els.summary.textContent = state.entries.length
+    ? `${state.entries.length} 名 → A4 ${pages.length} ページ(名札 ${cardTotal} 枚)`
+    : "";
   els.prevPage.disabled = state.page === 0;
   els.nextPage.disabled = state.page >= pageCount - 1;
 
@@ -793,15 +831,21 @@ function loadImageFile(file) {
   });
 }
 
+const DROPZONE_PROMPT = "クリックまたはドラッグ&ドロップで画像を選択";
+
+function setSource(source, label) {
+  state.source = source;
+  els.bgStatus.textContent = source ? `${label}(クリックまたはドロップで変更)` : DROPZONE_PROMPT;
+  els.dropzone.classList.toggle("has-image", Boolean(source));
+  setMessage("");
+  schedulePreview();
+}
+
 async function handleImageFile(file) {
   if (!file) return;
   try {
     const img = await loadImageFile(file);
-    state.source = prepareSource(img);
-    els.bgStatus.textContent = `${file.name}(${img.width}×${img.height})`;
-    els.dropzone.classList.add("has-image");
-    setMessage("");
-    schedulePreview();
+    setSource(prepareSource(img), `${file.name}(${img.width}×${img.height})`);
   } catch (error) {
     setMessage(error.message, true);
   }
@@ -810,15 +854,17 @@ async function handleImageFile(file) {
 function init() {
   els.names.value = sampleText(false);
   els.seed.value = randomSeed();
+  // 開いた直後から仕上がりのイメージが分かるよう、サンプル背景で始める
+  setSource(createSampleSource(), "サンプル背景");
 
   els.bgInput.addEventListener("change", () => handleImageFile(els.bgInput.files[0]));
   els.sampleBg.addEventListener("click", () => {
-    state.source = createSampleSource();
     els.bgInput.value = "";
-    els.bgStatus.textContent = "サンプル背景(自動生成)";
-    els.dropzone.classList.add("has-image");
-    setMessage("");
-    schedulePreview();
+    setSource(createSampleSource(), "サンプル背景");
+  });
+  els.clearBg.addEventListener("click", () => {
+    els.bgInput.value = "";
+    setSource(null);
   });
   ["dragenter", "dragover"].forEach((type) =>
     els.dropzone.addEventListener(type, () => els.dropzone.classList.add("dragover")),

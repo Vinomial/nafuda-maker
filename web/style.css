@@ -438,3 +438,18 @@ details.hint summary {
 .privacy-badge a {
   white-space: nowrap;
 }
+
+.summary {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 広い画面では、フォームを下までスクロールしてもプレビューが見えるようにする */
+@media (min-width: 821px) {
+  .preview-panel {
+    position: sticky;
+    top: 16px;
+  }
+}

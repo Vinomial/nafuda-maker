@@ -4,7 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>名札メーカー</title>
-    <meta name="description" content="背景画像と名前一覧から、A4 印刷用の名札 PDF をブラウザだけで作成します。" />
+    <meta name="description" content="背景画像と名前一覧から、A4 印刷用の名札 PDF をブラウザだけで作成します。入力した名前や画像は送信されません。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="名札メーカー" />
+    <meta property="og:description" content="背景画像と名前一覧から、A4 印刷用の名札 PDF をブラウザだけで作成します。入力した名前や画像は送信されません。" />
+    <meta name="theme-color" content="#b3261e" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -29,13 +34,14 @@
           <label for="bg-input" class="label">1. 背景画像 (PNG / JPEG)</label>
           <div id="dropzone" class="dropzone">
             <input id="bg-input" type="file" accept="image/*" />
-            <span id="bg-status">クリックまたはドラッグ&ドロップで選択</span>
+            <span id="bg-status">クリックまたはドラッグ&ドロップで画像を選択</span>
           </div>
           <div class="row-inline">
-            <button id="sample-bg" type="button" class="button secondary small">サンプル背景で試す</button>
+            <button id="sample-bg" type="button" class="button secondary small">サンプル背景</button>
+            <button id="clear-bg" type="button" class="button secondary small">背景なし(白)</button>
             <a class="hint" href="#backgrounds">背景素材の探し方</a>
           </div>
-          <p class="hint">白地が多く、上下に模様がある画像が向いています。未選択なら白背景になります。</p>
+          <p class="hint">白地が多く、上下に模様がある画像が向いています。</p>
         </section>
 
         <section class="field">
@@ -115,7 +121,9 @@
           </select>
         </details>
 
+        <p id="summary" class="summary"></p>
         <button id="generate" type="submit" class="button primary">PDF をダウンロード</button>
+        <p class="hint">印刷するときは、倍率を「100%」または「実際のサイズ」にしてください。「用紙に合わせる」だと名札が少し小さくなり、名札ケースに合わなくなります。</p>
         <p id="message" class="message" role="status" aria-live="polite"></p>
       </form>
 
