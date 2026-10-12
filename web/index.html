@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>名札メーカー</title>
+    <meta name="description" content="背景画像と名前一覧から、A4 印刷用の名札 PDF をブラウザだけで作成します。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;700&display=swap"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>名札メーカー</h1>
+      <p>背景画像と名前一覧から、A4 印刷用の名札 PDF を作ります。画像や名前はサーバーに送られず、すべてこのブラウザの中で処理されます。</p>
+    </header>
+
+    <main class="layout">
+      <form id="settings" class="panel" autocomplete="off">
+        <section class="field">
+          <label for="bg-input" class="label">1. 背景画像 (PNG / JPEG)</label>
+          <div id="dropzone" class="dropzone">
+            <input id="bg-input" type="file" accept="image/*" />
+            <span id="bg-status">クリックまたはドラッグ&ドロップで選択</span>
+          </div>
+          <p class="hint">白地が多く、上下に模様がある画像が向いています。未選択なら白背景になります。</p>
+        </section>
+
+        <section class="field">
+          <label for="names" class="label">2. 名前一覧</label>
+          <textarea id="names" rows="9" spellcheck="false"></textarea>
+          <div class="row-inline">
+            <label class="button secondary small">
+              CSV を読み込む
+              <input id="csv-input" type="file" accept=".csv,text/csv,text/plain" hidden />
+            </label>
+            <span id="name-count" class="hint"></span>
+          </div>
+          <p class="hint">1 行に 1 名。CSV を貼り付けても OK です(<code>name</code> / <code>氏名</code> / <code>名前</code> 列を自動で使います。<code>#</code> で始まる行は無視)。</p>
+        </section>
+
+        <section class="field">
+          <span class="label">3. 名札の設定</span>
+          <label class="sub" for="title">肩書き・団体名</label>
+          <input id="title" type="text" value="阪神タイガース" />
+
+          <label class="sub" for="name-font">名前のフォント</label>
+          <select id="name-font">
+            <option value="serif">明朝 (Noto Serif JP)</option>
+            <option value="sans">ゴシック (Noto Sans JP)</option>
+          </select>
+
+          <div class="grid-2">
+            <div>
+              <label class="sub" for="rows">1 ページの行数</label>
+              <input id="rows" type="number" min="1" max="12" value="5" />
+            </div>
+            <div>
+              <label class="sub" for="columns">1 行に並べる枚数</label>
+              <input id="columns" type="number" min="1" max="6" value="2" />
+            </div>
+          </div>
+
+          <label class="sub" for="seed">背景シード</label>
+          <div class="row-inline">
+            <input id="seed" type="text" />
+            <button id="reseed" type="button" class="button secondary small">シャッフル</button>
+          </div>
+          <p class="hint">同じシードなら同じ背景配置になります。</p>
+        </section>
+
+        <button id="generate" type="submit" class="button primary">PDF をダウンロード</button>
+        <p id="message" class="message" role="status" aria-live="polite"></p>
+      </form>
+
+      <section class="panel preview-panel" aria-label="プレビュー">
+        <div class="preview-head">
+          <h2>プレビュー</h2>
+          <div class="pager">
+            <button id="prev-page" type="button" class="button secondary small" aria-label="前のページ">‹</button>
+            <span id="page-label">1 / 1</span>
+            <button id="next-page" type="button" class="button secondary small" aria-label="次のページ">›</button>
+          </div>
+        </div>
+        <div class="sheet-wrap">
+          <div id="sheet" class="sheet"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
