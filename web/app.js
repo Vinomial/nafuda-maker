@@ -182,8 +182,8 @@ function splitCsvLine(line) {
   return fields;
 }
 
-// 1 行 1 名。列名の行があればそれに従い、なければ「名前,ふりがな,所属」の順とみなす
-function parseEntries(text) {
+// 1 行 1 名。列名の行があればそれに従い、なければ「名前,(ふりがな,)所属」の順とみなす
+function parseEntries(text, withKana) {
   const lines = text
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
@@ -192,7 +192,7 @@ function parseEntries(text) {
 
   const header = splitCsvLine(lines[0]).map((f) => f.trim().toLowerCase());
   const find = (key) => header.findIndex((f) => COLUMN_HEADERS[key].includes(f));
-  let columns = { name: 0, kana: 1, org: 2 };
+  let columns = withKana ? { name: 0, kana: 1, org: 2 } : { name: 0, kana: -1, org: 1 };
   let body = lines;
   if (find("name") >= 0) {
     columns = { name: find("name"), kana: find("kana"), org: find("org") };
@@ -552,7 +552,7 @@ const els = {
   prevPage: $("prev-page"),
   nextPage: $("next-page"),
   pageLabel: $("page-label"),
-  showKana: $("show-kana"),
+  kanaRadios: document.querySelectorAll('input[name="kana"]'),
   cardSize: $("card-size"),
   arrange: $("arrange"),
   border: $("border"),
@@ -567,12 +567,21 @@ const state = {
   rows: 5,
   columns: 2,
   seed: "",
-  showKana: true,
+  showKana: false,
   cardSize: null,
   arrange: "duplicate",
   border: "solid",
   page: 0,
 };
+
+function kanaEnabled() {
+  return document.querySelector('input[name="kana"]:checked')?.value === "on";
+}
+
+function sampleText(withKana) {
+  const rows = SAMPLE_ROWS.map(([name, kana]) => (withKana ? `${name},${kana}` : name));
+  return [withKana ? "名前,ふりがな,所属" : "名前,所属", ...rows].join("\n");
+}
 
 function readPositiveInt(input, fallback) {
   const value = parseInt(input.value, 10);
@@ -580,10 +589,10 @@ function readPositiveInt(input, fallback) {
 }
 
 function readForm() {
-  state.entries = parseEntries(els.names.value);
+  state.showKana = kanaEnabled();
+  state.entries = parseEntries(els.names.value, state.showKana);
   state.title = els.title.value.trim();
   state.nameFont = FONTS[els.nameFont.value] || FONTS.serif;
-  state.showKana = els.showKana.checked;
   state.cardSize = CONFIG.cardSizes[els.cardSize.value] || null;
   state.arrange = els.arrange.value;
   state.border = els.border.value;
@@ -766,7 +775,7 @@ async function handleImageFile(file) {
 }
 
 function init() {
-  els.names.value = ["名前,ふりがな,所属", ...SAMPLE_ROWS.map((row) => row.join(","))].join("\n");
+  els.names.value = sampleText(false);
   els.seed.value = randomSeed();
 
   els.bgInput.addEventListener("change", () => handleImageFile(els.bgInput.files[0]));
@@ -797,7 +806,15 @@ function init() {
   [els.names, els.title, els.rows, els.columns, els.seed].forEach((el) =>
     el.addEventListener("input", schedulePreview),
   );
-  [els.nameFont, els.showKana, els.cardSize, els.arrange, els.border].forEach((el) =>
+  // サンプルのままなら、ふりがなの有無に合わせてサンプルも入れ替える
+  els.kanaRadios.forEach((radio) =>
+    radio.addEventListener("change", () => {
+      const withKana = kanaEnabled();
+      if (els.names.value.trim() === sampleText(!withKana)) els.names.value = sampleText(withKana);
+      schedulePreview();
+    }),
+  );
+  [els.nameFont, els.cardSize, els.arrange, els.border].forEach((el) =>
     el.addEventListener("change", schedulePreview),
   );
   els.reseed.addEventListener("click", () => {

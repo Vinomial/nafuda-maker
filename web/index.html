@@ -40,6 +40,11 @@
 
         <section class="field">
           <label for="names" class="label">2. 名前一覧</label>
+          <div class="segmented" role="radiogroup" aria-label="ふりがな">
+            <span class="sub">ふりがな</span>
+            <label><input type="radio" name="kana" value="off" checked /> なし</label>
+            <label><input type="radio" name="kana" value="on" /> あり</label>
+          </div>
           <textarea id="names" rows="9" spellcheck="false"></textarea>
           <div class="row-inline">
             <label class="button secondary small">
@@ -48,7 +53,7 @@
             </label>
             <span id="name-count" class="hint"></span>
           </div>
-          <p class="hint">1 行に 1 名。<code>名前,ふりがな,所属</code> のようにカンマで区切ると、ふりがなや人ごとの所属も入れられます(後ろの列は省略可)。</p>
+          <p class="hint">1 行に 1 名。1 行目の列名に合わせてカンマで区切ります。所属は省略でき、入れた人だけ共通の肩書きの代わりに表示します。</p>
           <details class="hint">
             <summary>CSV の列名について</summary>
             1 行目に列名があれば、その列を使います。<code>name</code> / <code>氏名</code> / <code>名前</code>、<code>ふりがな</code> / <code>フリガナ</code> / <code>kana</code>、<code>所属</code> / <code>会社</code> / <code>部署</code> / <code>役職</code> などを自動で判定します。所属がある人は、共通の肩書きの代わりにそれを表示します。<code>#</code> で始まる行は無視します。
@@ -87,11 +92,6 @@
 
         <details class="field options">
           <summary class="label">4. 詳細オプション</summary>
-
-          <label class="check">
-            <input id="show-kana" type="checkbox" checked />
-            ふりがなを表示する(名前一覧にふりがながある場合)
-          </label>
 
           <label class="sub" for="card-size">名札のサイズ</label>
           <select id="card-size">
