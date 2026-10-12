@@ -16,7 +16,11 @@
   <body>
     <header class="site-header">
       <h1>名札メーカー</h1>
-      <p>背景画像と名前一覧から、A4 印刷用の名札 PDF を作ります。画像や名前はサーバーに送られず、すべてこのブラウザの中で処理されます。</p>
+      <p>背景画像と名前一覧から、A4 印刷用の名札 PDF を作ります。</p>
+      <p class="privacy-badge">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3Zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4-6.3 6.3Z"/></svg>
+        入力した名前や画像は送信・保存されません(<a href="#privacy">詳しく</a>)
+      </p>
     </header>
 
     <main class="layout">
@@ -26,6 +30,10 @@
           <div id="dropzone" class="dropzone">
             <input id="bg-input" type="file" accept="image/*" />
             <span id="bg-status">クリックまたはドラッグ&ドロップで選択</span>
+          </div>
+          <div class="row-inline">
+            <button id="sample-bg" type="button" class="button secondary small">サンプル背景で試す</button>
+            <a class="hint" href="#backgrounds">背景素材の探し方</a>
           </div>
           <p class="hint">白地が多く、上下に模様がある画像が向いています。未選択なら白背景になります。</p>
         </section>
@@ -46,7 +54,7 @@
         <section class="field">
           <span class="label">3. 名札の設定</span>
           <label class="sub" for="title">肩書き・団体名</label>
-          <input id="title" type="text" value="阪神タイガース" />
+          <input id="title" type="text" value="なふだ商事" />
 
           <label class="sub" for="name-font">名前のフォント</label>
           <select id="name-font">
@@ -91,6 +99,48 @@
         </div>
       </section>
     </main>
+
+    <section class="info">
+      <article id="privacy" class="panel">
+        <h2>個人情報について</h2>
+        <p><strong>入力した名前や背景画像は、どこにも送信・保存されません。</strong></p>
+        <ul>
+          <li>名札の画像も PDF も、お使いのブラウザの中だけで作っています。サーバーにアップロードする処理はありません。</li>
+          <li>ページを閉じたり再読み込みしたりすると、入力内容は消えます。</li>
+          <li>ページの表示に使うフォント(Google Fonts)と PDF 作成ライブラリ(cdnjs)は外部から読み込みますが、入力内容は含まれません。</li>
+          <li>アクセス解析やトラッキングは使っていません。</li>
+        </ul>
+        <p class="hint">ソースコードは <a href="https://github.com/Vinomial/nafuda-maker" target="_blank" rel="noopener">GitHub</a> で公開しています。</p>
+      </article>
+
+      <article id="backgrounds" class="panel">
+        <h2>背景素材の探し方</h2>
+        <p>上下に模様があり、中央が白っぽい横長〜正方形の画像がきれいに仕上がります。画像の上部と下部を切り出して、名札の上下の帯に使います。</p>
+        <ul class="links">
+          <li>
+            <a href="https://www.ac-illust.com/main/detail.php?id=1576410" target="_blank" rel="noopener">イラストAC「抽象模様の背景」</a>
+            <span class="hint">このツールに合わせやすいおすすめ素材(無料会員登録が必要)</span>
+          </li>
+          <li>
+            <a href="https://www.ac-illust.com/main/search_result.php?word=%E8%83%8C%E6%99%AF+%E3%83%95%E3%83%AC%E3%83%BC%E3%83%A0" target="_blank" rel="noopener">イラストAC で「背景 フレーム」を探す</a>
+            <span class="hint">日本語で探しやすい無料素材サイト</span>
+          </li>
+          <li>
+            <a href="https://pixabay.com/ja/images/search/%E8%83%8C%E6%99%AF%20%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3/" target="_blank" rel="noopener">Pixabay で「背景 パターン」を探す</a>
+            <span class="hint">登録なしでダウンロードできる無料素材サイト</span>
+          </li>
+          <li>
+            <a href="https://www.canva.com/ja_jp/" target="_blank" rel="noopener">Canva で自分で作る</a>
+            <span class="hint">テンプレートから背景を作って PNG で書き出せます</span>
+          </li>
+        </ul>
+        <p class="hint">素材を使う前に、各サイトの利用規約(商用利用・クレジット表記・加工の可否など)を確認してください。</p>
+      </article>
+    </section>
+
+    <footer class="site-footer">
+      <a href="https://github.com/Vinomial/nafuda-maker" target="_blank" rel="noopener">GitHub</a>
+    </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="app.js"></script>

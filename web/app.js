@@ -61,16 +61,17 @@ const FONTS = {
 };
 const TITLE_FONT = FONTS.sans;
 const NAME_HEADERS = ["name", "氏名", "名前", "fullname", "full_name"];
+// 架空の人物
 const SAMPLE_NAMES = [
-  "近本 光司",
-  "中野 拓夢",
-  "森下 翔太",
-  "佐藤 輝明",
-  "大山 悠輔",
-  "前川 右京",
-  "梅野 隆太郎",
-  "木浪 聖也",
-  "才木 浩人",
+  "山田 太郎",
+  "鈴木 花子",
+  "佐藤 一郎",
+  "高橋 美咲",
+  "田中 健太",
+  "伊藤 さくら",
+  "渡辺 大輔",
+  "中村 結衣",
+  "小林 翔",
 ];
 
 const MM = 72 / 25.4;
@@ -199,6 +200,39 @@ function prepareSource(image) {
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+// 素材がなくても試せるように、上下に水玉模様のある背景をその場で描く
+function createSampleSource() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 1100;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const rng = makeVariantRng("sample", "nafuda");
+  const colors = ["#f28b82", "#fbbc04", "#81c995", "#78d9ec", "#a7c7fa", "#d7aefb"];
+  const bands = [
+    [0, 470],
+    [630, 1100],
+  ];
+  for (let i = 0; i < 260; i++) {
+    const [top, bottom] = bands[i % 2];
+    ctx.globalAlpha = 0.45 + rng.random() * 0.4;
+    ctx.fillStyle = colors[rng.randint(0, colors.length - 1)];
+    ctx.beginPath();
+    ctx.arc(
+      rng.uniform(0, canvas.width),
+      rng.uniform(top, bottom),
+      rng.uniform(14, 64),
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
   return canvas;
 }
 
@@ -439,6 +473,7 @@ function computeLayout(rows, columns) {
 const $ = (id) => document.getElementById(id);
 const els = {
   bgInput: $("bg-input"),
+  sampleBg: $("sample-bg"),
   bgStatus: $("bg-status"),
   dropzone: $("dropzone"),
   names: $("names"),
@@ -635,6 +670,14 @@ function init() {
   els.seed.value = randomSeed();
 
   els.bgInput.addEventListener("change", () => handleImageFile(els.bgInput.files[0]));
+  els.sampleBg.addEventListener("click", () => {
+    state.source = createSampleSource();
+    els.bgInput.value = "";
+    els.bgStatus.textContent = "サンプル背景(自動生成)";
+    els.dropzone.classList.add("has-image");
+    setMessage("");
+    schedulePreview();
+  });
   ["dragenter", "dragover"].forEach((type) =>
     els.dropzone.addEventListener(type, () => els.dropzone.classList.add("dragover")),
   );

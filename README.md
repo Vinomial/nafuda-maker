@@ -58,9 +58,9 @@ python3 -m pip install -r requirements.txt
 # 名札に入れたい名前を1行ずつ書きます
 # 基本は name 列だけでOKです
 name
-近本 光司
-中野 拓夢
-森下 翔太
+山田 太郎
+鈴木 花子
+佐藤 一郎
 ```
 
 ### 4. PDF を生成する
